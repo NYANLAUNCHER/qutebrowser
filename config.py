@@ -27,18 +27,6 @@ c.editor.command = [
 ]
 c.editor.encoding = "utf-8"
 
-# Block youtube ads
-def filter_yt(info: interceptor.Request):
-    """Block given request if necessary"""
-    url = info.request_url
-    if (
-        url.host() == "www.youtube.com"
-        and url.path() == "/get_video_info"
-        and "&adformat=" in url.query()
-    ):
-        info.block
-interceptor.register(filter_yt)
-
 # Change the argument to True to still load settings configured via autoconfig.yml
 config.load_autoconfig(False)
 
@@ -82,17 +70,14 @@ c.url.start_pages = "https://search.brave.com/"
 c.url.searchengines = {
     'DEFAULT': 'https://search.brave.com/search?q={}',
     '/s': 'https://search.brave.com/search?q=site%3A{}',
+    '/gh': 'https://github.com/?q={}',# search personal repos
     '/sgh': 'https://search.brave.com/search?q=site%3Agithub.com {}',
-    '/srd': 'https://search.brave.com/search?q=site%3Awww.reddit.com {}',
-    '/od': 'https://odysee.com/$/search?q={}',
-    '/yt': 'https://www.youtube.com/results?search_query={}',
-    '/cs': 'http://cht.sh/{}',
     '/aw': 'https://wiki.archlinux.org/?search={}',
-    '/aur': 'https://aur.archlinux.org/packages?={}',
-    '/gh': 'https://github.com/NYANLAUNCHER?tab=repositories&q={}',
-    # russian (to english) dictionary
-    '/rud': 'https://en.bab.la/dictionary/english-russian/{}',
-    '/d': 'https://www.dictionary.com/browse/{}',
+    '/mdn': 'https://developer.mozilla.org/en-US/search?q={}',
+    '/ocw': 'https://ocw.mit.edu/search/?q={}',
+    '/yt': 'https://www.youtube.com/results?search_query={}',
+    '/od': 'https://odysee.com/$/search?q={}',
+    '/symbl': 'https://symbl.cc/en/search/?q={}',
 }
 
 # Set download settings
@@ -101,23 +86,31 @@ c.downloads.location.directory = os.getenv('XDG_DOWNLOADS_DIR', '~/tmp/')
 c.downloads.remove_finished = 3 #seconds
 
 # Set content settings
-## set true for only the current window
 c.content.autoplay = False
-c.content.pdfjs = True
+c.content.pdfjs = False
+c.content.blocking.method = 'both'
+
+# Block youtube ads (hopefully)
+def filter_yt(info: interceptor.Request):
+    """Block given request if necessary"""
+    url = info.request_url
+    if (
+        url.host() == "www.youtube.com"
+        and url.path() == "/get_video_info"
+        and "&adformat=" in url.query()
+    ):
+        info.block
+interceptor.register(filter_yt)
 
 c.scrolling.bar = "when-searching"
 
-# Set dark mode
-# A list of sites not to apply theme to
-unset_theme = [
-   "https://discord.com",
-   "https://www.youtube.com",
-   "https://www.eveonline.com",
-   "https://www.russianpod101.com",
-]
-# togle theme
-#config.bind("", "")
-#c.colors.webpage.darkmode.enabled = True
+c.colors.webpage.darkmode.enabled = False
+def toggle_darkmode():
+    if (c.colors.webpage.darkmode.enabled == False):
+        c.colors.webpage.darkmode.enabled == True
+    else:
+        c.colors.webpage.darkmode.enabled == False
+#config.bind("", toggle_darkmode())
 
 # Which cookies to accept. With QtWebEngine, this setting also controls
 # other features with tracking capabilities similar to those of cookies;
@@ -245,6 +238,13 @@ config.set('content.notifications.enabled', False, 'https://www.youtube.com')
 # Keybinds
 config.unbind("gC")
 config.unbind("co")
+
+# Scroll page,                  X:    Y:
+config.bind("j", "scroll-page   0    0.1")
+config.bind("k", "scroll-page   0   -0.1")
+config.bind("h", "scroll-page  0.1    0")
+config.bind("l", "scroll-page -0.1    0")
+
 config.bind("<Ctrl-h>", "home")
 # '-s' add space to end
 # '-tr' create new tab after current
@@ -261,15 +261,21 @@ config.bind("gO", "open -tr {url:pretty}")
 
 config.bind("gD", "cmd-set-text -s :tab-give")
 
-config.bind("gs", "open qute://settings")
+config.unbind("gb")
+config.unbind("gm")
 config.bind("gh", "help")
+config.bind("gb", "bookmark-list")
+config.bind("b", "cmd-set-text -s :bookmark-load")
+config.bind("gM", "tab-move")
+config.bind("gs", "open qute://settings")
 config.bind(",h", "cmd-set-text -s :help")
 config.bind("<Ctrl-q>", "close")
+
 #make this goto the last scroll percentage
 config.bind("<Ctrl-o>", "tab-focus last")
 #c.tabs.select_on_remove = "last-used"
 c.tabs.select_on_remove = "next"
-c.tabs.last_close = "startpage"
+c.tabs.last_close = "close"
 #config.bind("d", "tab-close;; tab-focus last or prev")
 config.bind("<Ctrl-n>", "fake-key <Tab>")
 config.bind("<Ctrl-p>", "fake-key <Shift-Tab>")
@@ -277,10 +283,6 @@ config.bind("<Ctrl-p>", "fake-key <Shift-Tab>")
 #view yt/od playlists in mpv
 config.bind(",v", "spawn --detach mpv --force-window=yes {url}")
 config.bind(";v", "hint links spawn --detach mpv --force-window=yes {hint-url}")
-
-config.unbind("gm")
-config.bind("gm", "bookmark-list")
-config.bind("gM", "tab-move")
 
 #hide tabs and cmdline
 config.bind("xf", "config-cycle tabs.show always never;; config-cycle statusbar.show always never;; config-cycle scrolling.bar when-searching never")
@@ -292,24 +294,25 @@ config.bind("<Ctrl-j>", "tab-move +")
 config.bind("<Ctrl-k>", "tab-move -")
 
 ## Insert mode bindings
-config.bind("<Ctrl-h>", "fake-key <Backspace>",          "insert")
-config.bind("<Ctrl-a>", "fake-key <Home>",               "insert")
-config.bind("<Ctrl-e>", "fake-key <End>",                "insert")
-config.bind("<Ctrl-b>", "fake-key <Left>",               "insert")
-config.bind("<Alt-b>",  "fake-key <Ctrl-Left>",          "insert")
-config.bind("<Ctrl-f>", "fake-key <Right>",              "insert")
-config.bind("<Alt-f>",  "fake-key <Ctrl-Right>",         "insert")
-config.bind("<Ctrl-p>", "fake-key <Up>",                 "insert")
-config.bind("<Ctrl-n>", "fake-key <Down>",               "insert")
-config.bind("<Alt-d>",  "fake-key <Ctrl-Delete>",        "insert")
-config.bind("<Ctrl-d>", "fake-key <Delete>",             "insert")
-config.bind("<Ctrl-w>", "fake-key <Ctrl-backspace>",     "insert")
-config.bind("<Ctrl-u>", "fake-key <Shift-Home><Delete>", "insert")
-config.bind("<Ctrl-k>", "fake-key <Shift-End><Delete>",  "insert")
+config.bind("<Ctrl-m>", "fake-key <Enter>",              mode="insert")
+config.bind("<Ctrl-h>", "fake-key <Backspace>",          mode="insert")
+config.bind("<Ctrl-a>", "fake-key <Home>",               mode="insert")
+config.bind("<Ctrl-e>", "fake-key <End>",                mode="insert")
+config.bind("<Ctrl-b>", "fake-key <Left>",               mode="insert")
+config.bind("<Alt-b>",  "fake-key <Ctrl-Left>",          mode="insert")
+config.bind("<Ctrl-f>", "fake-key <Right>",              mode="insert")
+config.bind("<Alt-f>",  "fake-key <Ctrl-Right>",         mode="insert")
+config.bind("<Alt-d>",  "fake-key <Ctrl-Delete>",        mode="insert")
+config.bind("<Ctrl-d>", "fake-key <Delete>",             mode="insert")
+config.bind("<Ctrl-w>", "fake-key <Ctrl-backspace>",     mode="insert")
+config.bind("<Ctrl-u>", "fake-key <Shift-Home><Delete>", mode="insert")
+config.bind("<Ctrl-k>", "fake-key <Shift-End><Delete>",  mode="insert")
+config.unbind("<Ctrl-p>")
+config.unbind("<Ctrl-n>")
+config.bind("<Ctrl-p>", "fake-key <Up>",                 mode="insert")
+config.bind("<Ctrl-n>", "fake-key <Down>",               mode="insert")
 
 ## Command mode bindings
-#config.unbind("<Ctrl-n>", mode="command")
-#config.unbind("<Ctrl-p>", mode="command")
-config.bind("<Ctrl-n>", "fake-key <Down>", "command")
-config.bind("<Ctrl-p>", "fake-key <Up>", "command")
+config.bind("<Ctrl-p>", "fake-key <Up>", mode="command")
+config.bind("<Ctrl-n>", "fake-key <Down>", mode="command")
 
